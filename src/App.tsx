@@ -13,8 +13,11 @@ import {
   FileText, 
   CheckCircle2,
   AlertCircle,
-  Search
+  Search,
+  FileSpreadsheet,
+  Layers
 } from 'lucide-react';
+import { utils, writeFile } from 'xlsx';
 
 interface DataRecord {
   id: string;
@@ -32,6 +35,7 @@ export default function App() {
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tabela' | 'download'>('tabela');
 
   const formatDateBR = (dateStr: string) => {
     if (!dateStr || dateStr === '-') return '-';
@@ -86,9 +90,38 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDownloadExcel = () => {
+    const wsData = data.map(r => ({
+      'Data': r.date,
+      'Valor': r.value,
+      'ID Documento': r.docId,
+      'Status': r.status,
+      'Tipo': r.type,
+      'Hash / Chave': r.hash
+    }));
+    
+    const ws = utils.json_to_sheet(wsData);
+    
+    // Ajustar largura das colunas
+    const wscols = [
+      {wch: 12}, // Data
+      {wch: 10}, // Valor
+      {wch: 15}, // ID Doc
+      {wch: 8},  // Status
+      {wch: 8},  // Tipo
+      {wch: 30}, // Hash
+    ];
+    ws['!cols'] = wscols;
+
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "Consolidado");
+    writeFile(wb, "consolidado_tms_sap.xlsx");
+  };
+
   const handleClear = () => {
     setInputText('');
     setSearchQuery('');
+    setActiveTab('tabela');
   };
 
   return (
@@ -180,103 +213,186 @@ export default function App() {
           </section>
 
           {/* Results Section */}
-          <section className="lg:col-span-7 flex flex-col space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Filtrar por ID, Hash ou Data..."
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm outline-none ring-indigo-500/20 transition-all focus:border-indigo-500 focus:ring-4"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+          <section className="lg:col-span-7 flex flex-col space-y-4">
+            <div className="flex items-center gap-1 rounded-xl bg-slate-200/50 p-1 self-start">
               <button
-                id="export-csv"
-                onClick={handleCopyCsv}
-                disabled={data.length === 0}
-                className={`flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none ${
-                   copied 
-                   ? 'bg-green-600 text-white shadow-lg shadow-green-200' 
-                   : 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700'
+                onClick={() => setActiveTab('tabela')}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                  activeTab === 'tabela' 
+                  ? 'bg-white text-indigo-600 shadow-sm' 
+                  : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {copied ? <CheckCircle2 size={18} /> : <Download size={18} />}
-                <span>{copied ? 'Copiado para Excel/CSV' : 'Copiar CSV'}</span>
+                <TableIcon size={16} />
+                Tabela
+              </button>
+              <button
+                onClick={() => setActiveTab('download')}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                  activeTab === 'download' 
+                  ? 'bg-white text-indigo-600 shadow-sm' 
+                  : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Download size={16} />
+                Download
               </button>
             </div>
 
-            <div className="flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/50">
-              <div className="overflow-x-auto min-h-[400px]">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-slate-50/90 backdrop-blur-sm border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4 font-semibold text-slate-700">Data</th>
-                      <th className="px-6 py-4 font-semibold text-slate-700">Valor</th>
-                      <th className="px-6 py-4 font-semibold text-slate-700">ID Documento</th>
-                      <th className="px-6 py-4 font-semibold text-slate-700">Tipo</th>
-                      <th className="px-6 py-4 font-semibold text-slate-700">Hash/Chave</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    <AnimatePresence mode="popLayout">
-                      {filteredData.length > 0 ? (
-                        filteredData.map((record) => (
-                          <motion.tr
-                            layout
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            key={record.id}
-                            className="group hover:bg-slate-50 transition-colors"
-                          >
-                            <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-600">
-                              {record.date}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 font-bold text-slate-900">
-                              {record.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 text-slate-500">
-                              <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] font-medium text-slate-600 group-hover:bg-white transition-colors">
-                                {record.docId}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4">
-                              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/10">
-                                {record.type}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-6 py-4 font-mono text-[11px] text-slate-400">
-                              {record.hash}
-                            </td>
-                          </motion.tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="py-24 text-center">
-                            <div className="flex flex-col items-center justify-center space-y-4">
-                              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 text-slate-300">
-                                {inputText ? <AlertCircle size={32} /> : <Clipboard size={32} />}
-                              </div>
-                              <div className="max-w-[200px] text-slate-400">
-                                {inputText 
-                                  ? "Nenhum resultado encontrado para sua busca." 
-                                  : "Aguardando entrada de dados para processamento."}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </AnimatePresence>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-slate-400 italic px-2">
-              <AlertCircle size={12} />
-              Dica: Use o botão "Copiar CSV" para colar os dados diretamente no Excel utilizando o "V ponto e vírgula" ( ; ) como separador.
-            </div>
+            <AnimatePresence mode="wait">
+              {activeTab === 'tabela' ? (
+                <motion.div
+                  key="table-tab"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="flex flex-col space-y-4"
+                >
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Filtrar por ID, Hash ou Data..."
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none ring-indigo-500/20 transition-all focus:border-indigo-500 focus:ring-4"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-slate-200/50">
+                    <div className="overflow-x-auto min-h-[400px]">
+                      <table className="w-full text-left text-sm">
+                        <thead className="sticky top-0 bg-slate-50/90 backdrop-blur-sm border-b border-slate-200">
+                          <tr>
+                            <th className="px-6 py-4 font-semibold text-slate-700">Data</th>
+                            <th className="px-6 py-4 font-semibold text-slate-700">Valor</th>
+                            <th className="px-6 py-4 font-semibold text-slate-700">ID Documento</th>
+                            <th className="px-6 py-4 font-semibold text-slate-700">Tipo</th>
+                            <th className="px-6 py-4 font-semibold text-slate-700">Hash/Chave</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          <AnimatePresence mode="popLayout">
+                            {filteredData.length > 0 ? (
+                              filteredData.map((record) => (
+                                <motion.tr
+                                  layout
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  key={record.id}
+                                  className="group hover:bg-slate-50 transition-colors"
+                                >
+                                  <td className="whitespace-nowrap px-6 py-4 font-medium text-slate-600">
+                                    {record.date}
+                                  </td>
+                                  <td className="whitespace-nowrap px-6 py-4 font-bold text-slate-900">
+                                    {record.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="whitespace-nowrap px-6 py-4 text-slate-500">
+                                    <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] font-medium text-slate-600 group-hover:bg-white transition-colors">
+                                      {record.docId}
+                                    </span>
+                                  </td>
+                                  <td className="whitespace-nowrap px-6 py-4">
+                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/10">
+                                      {record.type}
+                                    </span>
+                                  </td>
+                                  <td className="whitespace-nowrap px-6 py-4 font-mono text-[11px] text-slate-400">
+                                    {record.hash}
+                                  </td>
+                                </motion.tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={5} className="py-24 text-center">
+                                  <div className="flex flex-col items-center justify-center space-y-4">
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-50 text-slate-300">
+                                      {inputText ? <AlertCircle size={32} /> : <Clipboard size={32} />}
+                                    </div>
+                                    <div className="max-w-[200px] text-slate-400">
+                                      {inputText 
+                                        ? "Nenhum resultado encontrado para sua busca." 
+                                        : "Aguardando entrada de dados para processamento."}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </AnimatePresence>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="download-tab"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="flex flex-col space-y-6"
+                >
+                  <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+                    <div className="flex flex-col items-center text-center space-y-6">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                        <Layers size={40} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">Exportar Consolidado</h3>
+                        <p className="mt-1 text-sm text-slate-500">Escolha o formato desejado para baixar sua base de dados processada.</p>
+                      </div>
+
+                      <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
+                        {/* Excel Export */}
+                        <button
+                          onClick={handleDownloadExcel}
+                          disabled={data.length === 0}
+                          className="flex flex-col items-center gap-3 rounded-2xl border-2 border-slate-100 p-6 transition-all hover:border-emerald-500 hover:bg-emerald-50/50 disabled:opacity-50 disabled:pointer-events-none group"
+                        >
+                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 transition-transform group-hover:scale-110">
+                            <FileSpreadsheet size={24} />
+                          </div>
+                          <div className="text-center">
+                            <div className="font-bold text-slate-900">Microsoft Excel</div>
+                            <div className="text-xs text-slate-500">Arquivo .xlsx nativo</div>
+                          </div>
+                        </button>
+
+                        {/* CSV Export */}
+                        <button
+                          onClick={handleCopyCsv}
+                          disabled={data.length === 0}
+                          className="flex flex-col items-center gap-3 rounded-2xl border-2 border-slate-100 p-6 transition-all hover:border-indigo-500 hover:bg-indigo-50/50 disabled:opacity-50 disabled:pointer-events-none group"
+                        >
+                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 transition-transform group-hover:scale-110">
+                            {copied ? <CheckCircle2 size={24} /> : <Clipboard size={24} />}
+                          </div>
+                          <div className="text-center">
+                            <div className="font-bold text-slate-900">{copied ? 'Copiado!' : 'Copiar CSV'}</div>
+                            <div className="text-xs text-slate-500">Separador ponto e vírgula</div>
+                          </div>
+                        </button>
+                      </div>
+
+                      <div className="w-full rounded-xl bg-slate-50 p-4 text-left">
+                        <h4 className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                          <AlertCircle size={14} />
+                          Informações Importantes
+                        </h4>
+                        <ul className="space-y-2 text-xs text-slate-500 list-disc pl-4">
+                          <li>O arquivo Excel já vem com colunas formatadas e larguras ajustadas.</li>
+                          <li>O formato CSV é ideal para importação rápida em sistemas legados.</li>
+                          <li>A data foi convertida automaticamente para o padrão brasileiro (DD/MM/AAAA).</li>
+                          <li>Total de {stats.total} registros prontos para exportação.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
         </div>
       </main>
