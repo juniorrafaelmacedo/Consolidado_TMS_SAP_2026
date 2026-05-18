@@ -1,0 +1,8 @@
+{
+  "name": "Consolidado TMS x SAP",
+  "description": "Uma ferramenta para separar e organizar dados NFSe delimitados por barras em uma tabela estruturada.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
